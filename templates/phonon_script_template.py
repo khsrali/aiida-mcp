@@ -46,15 +46,15 @@ builder.scf.kpoints.set_kpoints_mesh({kpoints})
 print("Submitting calculation...")
 results, calc = run_get_node(builder)
 
-print("Calculation submitted with PID: {{calc.pk}}")
+print(f"Calculation submitted with PK: {{calc.pk}}")
 print("=" * 50)
 print("Monitor progress with:")
-print("  verdi process show {{calc.pk}}")
-print("  verdi process report {{calc.pk}}")
+print(f"  verdi process show {{calc.pk}}")
+print(f"  verdi process report {{calc.pk}}")
 print("=" * 50)
 
 # Save process ID for reference
-with open("last_calculation_pid.txt", "w") as f:
+with open("last_calculation_pk.txt", "w") as f:
     f.write(str(calc.pk))
 
-print("Process ID saved to: last_calculation_pid.txt")
+print("Process ID saved to: last_calculation_pk.txt")
