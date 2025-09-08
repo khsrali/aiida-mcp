@@ -1,0 +1,7 @@
+label: pw-7.3
+description: Quantum ESPRESSO pw.x v7.3 on Thor 
+default_calc_job_plugin: quantumespresso.pw
+computer: thor
+filepath_executable: /mnt/home/software/qe/7.3-ioapi/bin/pw.x
+prepend_text: 'source  /mnt/home/software/qe/7.3-ioapi/source.sh'
+append_text: ' '

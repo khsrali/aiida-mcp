@@ -1,0 +1,7 @@
+label: phonopy
+description: phonopy on Thor
+default_calc_job_plugin: phonopy.phonopy
+computer: localhost
+filepath_executable: /home/khosra_a/development/venv/aiida-firecrest/bin/phonopy
+prepend_text: 'activatev aiida-firecrest '
+append_text: ' '
