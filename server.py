@@ -33,7 +33,19 @@ logging.basicConfig(
 class AiidaMCPServer:
     def __init__(self):
         self.server = Server("aiida-phonon-calculator")
+        self.templates_dir = Path(__file__).parent / "templates"
+        self.config_dir = Path(__file__).parent / "configs"
+
         self.setup_handlers()
+
+    def _load_template(self, filename: str) -> str:
+        """Load template from file"""
+        try:
+            template_path = self.templates_dir / filename
+            return template_path.read_text()
+        except Exception as e:
+            logger.error(f"Failed to load template {filename}: {e}")
+            return f"Error loading template: {filename}"
 
     def setup_handlers(self):
         """Setup all MCP handlers"""
@@ -283,7 +295,6 @@ class AiidaMCPServer:
             "pw": "pw-7.3.yaml",
             "phonopy": "phonopy.yaml"
         }
-        config_path = Path(os.path.dirname(__file__), "configs")
 
         config_file = config_map.get(code_type)
         if not config_file:
@@ -292,7 +303,7 @@ class AiidaMCPServer:
                 text=f"Unknown code type: {code_type}"
             )]
 
-        config_file_path = config_path.joinpath(config_file)
+        config_file_path = self.config_dir.joinpath(config_file)
 
         try:
             result = subprocess.run(
@@ -367,67 +378,18 @@ class AiidaMCPServer:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         script_name = f"phonon_calculation_{material}_{timestamp}.py"
 
-        script_content = f'''#!/usr/bin/env python3
-"""
-Phonon band structure calculation for {material}
-Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-"""
-
-from aiida import load_profile
-from aiida.plugins import DbImporterFactory
-from ase import io
-from aiida import orm
-from aiida.plugins import WorkflowFactory
-from aiida.engine import run_get_node
-from aiida_vibroscopy.common.properties import PhononProperty
-
-# Load AiiDA profile
-load_profile()
-
-print("Starting phonon calculation for {material}")
-print("=" * 50)
-
-# Load structure
-print(f"Loading structure from: {structure_file}")
-structure = io.read('{structure_file}')
-
-# Setup workflow
-PhononWorkChain = WorkflowFactory("vibroscopy.phonons.phonon")
-
-print("Building workflow with protocol: {protocol}")
-builder = PhononWorkChain.get_builder_from_protocol(
-    pw_code=orm.load_code('{pw_code}'),
-    structure=orm.StructureData(ase=structure),
-    protocol="{protocol}",
-    phonopy_code=orm.load_code('{phonopy_code}'),
-    phonon_property=PhononProperty.BANDS
-)
-
-# Configure parameters
-print(f"Setting supercell: {supercell}")
-builder.supercell_matrix = orm.List({supercell})
-
-print(f"Setting k-points mesh: {kpoints}")
-builder.scf.kpoints = orm.KpointsData()
-builder.scf.kpoints.set_kpoints_mesh({kpoints})
-
-# Run calculation
-print("Submitting calculation...")
-results, calc = run_get_node(builder)
-
-print(f"Calculation submitted with PID: {{calc.pk}}")
-print("=" * 50)
-print("Monitor progress with:")
-print(f"  verdi process show {{calc.pk}}")
-print(f"  verdi process report {{calc.pk}}")
-print("=" * 50)
-
-# Save process ID for reference
-with open("last_calculation_pid.txt", "w") as f:
-    f.write(str(calc.pk))
-
-print(f"Process ID saved to: last_calculation_pid.txt")
-'''
+        # Load template and substitute variables
+        script_template = self._load_template("phonon_script_template.py")
+        script_content = script_template.format(
+            material=material,
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            structure_file=structure_file,
+            protocol=protocol,
+            supercell=supercell,
+            kpoints=kpoints,
+            pw_code=pw_code,
+            phonopy_code=phonopy_code
+        )
 
         # Save script to file
         script_path = Path.cwd() / script_name
@@ -456,21 +418,20 @@ print(f"Process ID saved to: last_calculation_pid.txt")
             )
 
             if result.returncode == 0:
-                # Try to extract PID from output
-                pid = None
+                # Try to extract PK from output
                 for line in result.stdout.split('\n'):
-                    if 'PID:' in line or 'pk:' in line:
+                    if 'pk:' in line:
                         # Extract number from line
                         import re
                         match = re.search(r'\d+', line)
                         if match:
-                            pid = match.group()
+                            pk = match.group()
                             break
 
                 response = f"Calculation started successfully!\n{result.stdout}"
-                if pid:
-                    response += f"\n\nProcess ID: {pid}\n"
-                    response += f"Monitor with: verdi process show {pid}"
+                if pk:
+                    response += f"\n\nProcess ID: {pk}\n"
+                    response += f"Monitor with: verdi process show {pk}"
 
                 return [types.TextContent(type="text", text=response)]
             else:
@@ -517,105 +478,15 @@ print(f"Process ID saved to: last_calculation_pid.txt")
 
     def get_phonon_workflow_template(self) -> str:
         """Return the phonon workflow template"""
-        return '''from aiida import load_profile
-from aiida.plugins import DbImporterFactory
-from ase import io
-from aiida import orm
-from aiida.plugins import WorkflowFactory
-from aiida.engine import run_get_node
-from aiida_vibroscopy.common.properties import PhononProperty
-
-load_profile()
-
-# Load structure
-structure = io.read('Si_mp-149_primitive.cif')
-
-# Setup workflow
-PhononWorkChain = WorkflowFactory("vibroscopy.phonons.phonon")
-builder = PhononWorkChain.get_builder_from_protocol(
-    pw_code=orm.load_code('pw-7.3@thor'),
-    structure=orm.StructureData(ase=structure),
-    protocol="fast",
-    phonopy_code=orm.load_code('phonopy@localhost'),
-    phonon_property=PhononProperty.BANDS
-)
-
-# Configure parameters
-builder.supercell_matrix = orm.List([1,1,1])
-builder.scf.kpoints = orm.KpointsData()
-builder.scf.kpoints.set_kpoints_mesh([3,3,3])
-
-# Run calculation
-results, calc = run_get_node(builder)
-'''
+        return self._load_template("phonon_workflow_template.py")
 
     def get_code_configs(self) -> str:
         """Return YAML configurations for codes"""
-        return '''# pw-7.3.yaml
-label: "pw-7.3"
-computer: "localhost"
-description: "Quantum ESPRESSO pw.x v7.3"
-filepath_executable: "/usr/local/bin/pw.x"
-default_calc_job_plugin: "quantumespresso.pw"
-prepend_text: |
-  export OMP_NUM_THREADS=1
-
----
-
-# phonopy.yaml
-label: "phonopy"
-computer: "localhost"
-description: "Phonopy for phonon calculations"
-filepath_executable: "/usr/local/bin/phonopy"
-default_calc_job_plugin: "phonopy.phonopy"
-prepend_text: |
-  export OMP_NUM_THREADS=1
-'''
+        return self._load_template("code_configs.yaml")
 
     def get_workflow_guide(self) -> str:
         """Return the workflow documentation"""
-        return '''# AiiDA Phonon Calculation Workflow Guide
-
-## Prerequisites
-1. AiiDA installation with profile configured
-2. Quantum ESPRESSO (pw.x) installed
-3. Phonopy installed
-4. aiida-vibroscopy plugin installed
-5. Pseudopotentials (PBEsol recommended)
-
-## Step-by-Step Process
-
-### 1. Setup Check
-- Verify codes: `verdi code list`
-- Check pseudopotentials: `aiida-pseudo list`
-- Ensure computer is configured: `verdi computer list`
-
-### 2. Prepare Structure
-- Obtain CIF or POSCAR file for your material
-- Can download from Materials Project or other databases
-- Ensure structure is properly formatted
-
-### 3. Configure Calculation Parameters
-- **Protocol**: fast/moderate/precise
-- **K-points mesh**: Density for SCF calculation
-- **Supercell size**: For phonon displacement calculations
-- **Codes**: Select appropriate QE and Phonopy codes
-
-### 4. Run Calculation
-- Execute the generated Python script
-- Monitor with verdi process commands
-- Check for convergence and errors
-
-### 5. Retrieve Results
-- Export band structure data
-- Visualize phonon dispersion
-- Calculate phonon DOS if needed
-
-## Common Issues
-- Memory errors: Reduce supercell size or k-points
-- Convergence issues: Adjust SCF parameters
-- Missing features: Check aiida-vibroscopy version
-'''
+        return self._load_template("workflow_guide.md")
 
     async def run(self):
         """Run the MCP server"""
