@@ -22,7 +22,7 @@ A Model Context Protocol (MCP) server that provides tools for calculating phonon
 
 1. Configure AiiDA (if not already done):
 ```bash
-verdi quicksetup
+verdi presto
 verdi computer setup
 verdi computer configure core.local localhost
 ```
