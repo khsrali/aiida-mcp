@@ -67,7 +67,7 @@ The best part? It adapts to your environment. When I told it I had my own silico
 
 ### Real Results, No Hassle
 
-Within minutes, I had a phonon calculation running on our HPC cluster. The assistant generated a proper Python script, submitted it to AiiDA, and gave me the PK to monitor. When I asked about convergence, it pulled the actual SCF convergence data - down to the numerical precision (2.51e-13 eV error!).
+Within minutes, I had a phonon calculation running on our HPC cluster. The assistant generated a proper Python script, submitted it to AiiDA, and gave me the PK to monitor. When I asked about convergence, it pulled the actual SCF convergence data.
 
 ### Why This Matters
 
